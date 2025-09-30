@@ -44,3 +44,8 @@ Thumbs.db
 /tmp/
 *.tmp
 *.log
+
+# Sample files (for demo purposes only)
+sample_prospectus.pdf
+sample_prospectus.html
+create_sample_pdf.py
