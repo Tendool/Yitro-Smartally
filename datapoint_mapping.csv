@@ -1,0 +1,7 @@
+Instruction,Datapoint,Class,OutputRule
+"Return only the Data Value of TOTAL_ANNUAL_FUND_OPERATING_EXPENSES for {class}",TOTAL_ANNUAL_FUND_OPERATING_EXPENSES,{class},percentage
+"Return only the Data Value of NET_EXPENSES (after fee waiver/expense reimbursement) for {class}",NET_EXPENSES,{class},percentage
+"From the Minimum Investment section of the PDF, focus only on the {class} block. Extract the value after 'Automatic Investment Plans' under 'Subsequent investment:'",MINIMUM_SUBSEQUENT_INVESTMENT_AIP,{class},currency
+"Initial investment for {class}",INITIAL_INVESTMENT,{class},currency_or_text
+"CDSC {class}",CDSC,{class},cdsc_special
+"Redemption Fee for {class}",REDEMPTION_FEE,{class},text
