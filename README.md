@@ -36,7 +36,19 @@ pip install -r requirements.txt
 
 ## Usage
 
-Run the Streamlit application:
+### Quick Start
+
+**Linux/Mac:**
+```bash
+./run.sh
+```
+
+**Windows:**
+```bash
+run.bat
+```
+
+Or manually run:
 ```bash
 streamlit run smartally.py
 ```
