@@ -1,7 +1,7 @@
 """
-SmartAlly - Rule-Based Document Data Extractor Chatbot
+SmartAlly - LLM-Based Document Data Extractor Chatbot
 A Streamlit application for extracting structured data from PDF and HTML documents
-using rule-based pattern matching.
+using OpenAI GPT-3.5 Turbo for intelligent pattern matching.
 """
 
 import streamlit as st
@@ -12,6 +12,21 @@ import pandas as pd
 import re
 from typing import Dict, List, Tuple, Optional, Any
 import io
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize OpenAI client (only if API key is available)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+
+if OPENAI_API_KEY:
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    client = None
 
 
 # ============================================================================
@@ -109,7 +124,247 @@ def parse_html(file) -> Tuple[str, Dict[str, str]]:
 
 
 # ============================================================================
-# Data Extraction Functions
+# LLM-Based Data Extraction Functions
+# ============================================================================
+
+def extract_datapoint_with_llm(text: str, tables: List[List[str]], datapoint_name: str, 
+                               class_name: str, output_rule: str, 
+                               page_texts: Optional[Dict[int, str]] = None) -> Tuple[Optional[str], Optional[str], Optional[int]]:
+    """
+    Extract a specific datapoint from text using LLM (GPT-3.5 Turbo).
+    
+    Args:
+        text: Raw text to search
+        tables: List of tables from the document
+        datapoint_name: Name of the datapoint to extract
+        class_name: Share class (e.g., "Class A", "Class I")
+        output_rule: Formatting rule for output
+        page_texts: Optional dictionary of page texts for better location tracking
+        
+    Returns:
+        Tuple of (extracted value, location description, page number)
+    """
+    
+    if not client:
+        return "0", None, None
+    
+    # Format tables as text for the LLM
+    tables_text = ""
+    if tables:
+        tables_text = "\n\nTABLES IN DOCUMENT:\n"
+        for i, table in enumerate(tables[:5], 1):  # Limit to first 5 tables
+            tables_text += f"\nTable {i}:\n"
+            for row in table[:10]:  # Limit rows per table
+                tables_text += "| " + " | ".join([str(cell) for cell in row]) + " |\n"
+    
+    # Create a comprehensive prompt for the LLM
+    prompt = f"""You are a financial document data extraction assistant. Your task is to extract specific data points from fund prospectus documents.
+
+TASK: Extract the {datapoint_name} for {class_name}.
+
+DOCUMENT TEXT:
+{text[:8000]}  
+
+{tables_text}
+
+INSTRUCTIONS:
+1. Find the {datapoint_name} value for {class_name} in the document
+2. Return ONLY the value in the format specified by the output rule: {output_rule}
+3. Also identify the specific location/section where this value was found
+4. Include relevant context words or phrases that appear near the value
+
+OUTPUT FORMAT (respond in exactly this JSON format):
+{{
+    "value": "the extracted value (or '0' if not found)",
+    "location": "specific section/context where found",
+    "context": "2-3 words or phrases that appear near the value in the document"
+}}
+
+DATAPOINT DESCRIPTIONS:
+- TOTAL_ANNUAL_FUND_OPERATING_EXPENSES: The total annual operating expenses percentage
+- NET_EXPENSES: Net expenses after fee waivers/reimbursements
+- MINIMUM_SUBSEQUENT_INVESTMENT_AIP: Minimum subsequent investment for Automatic Investment Plans
+- INITIAL_INVESTMENT: Initial investment amount required
+- CDSC: Contingent Deferred Sales Charge information
+- REDEMPTION_FEE: Redemption fee details
+
+OUTPUT RULES:
+- percentage: Return as "X.XX%" (e.g., "1.19%")
+- currency: Return as "$X" or "$X,XXX" (e.g., "$50", "$2,500")
+- currency_or_text: Return dollar amount or text like "No minimum"
+- text: Return as descriptive text
+- cdsc_special: Return in format "X year, Y% then Z%"
+
+Remember: Return "0" if the value is not found. Be precise and extract only the requested information."""
+
+    try:
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a precise financial data extraction assistant. Always respond with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,  # Low temperature for consistent extraction
+            max_tokens=500
+        )
+        
+        # Parse response
+        response_text = response.choices[0].message.content.strip()
+        
+        # Extract JSON from response (handle markdown code blocks)
+        import json
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        result = json.loads(response_text)
+        
+        value = result.get("value", "0")
+        location = result.get("location", "document")
+        context = result.get("context", "")
+        
+        # Find page number based on context
+        page_num = None
+        if page_texts and context:
+            context_words = context.lower().split()
+            for pnum, ptext in page_texts.items():
+                ptext_lower = ptext.lower()
+                # Check if multiple context words appear on this page
+                matches = sum(1 for word in context_words if word in ptext_lower)
+                if matches >= 2:  # At least 2 context words must match
+                    page_num = pnum
+                    break
+        
+        return value, location, page_num
+        
+    except Exception as e:
+        st.error(f"LLM extraction error: {str(e)}")
+        return "0", None, None
+
+
+def parse_user_prompt_with_llm(prompt: str, mapping_df: pd.DataFrame) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Parse user prompt using LLM to identify datapoint and class.
+    
+    Args:
+        prompt: User's natural language prompt
+        mapping_df: DataFrame with datapoint mappings
+        
+    Returns:
+        Tuple of (datapoint_name, class_name)
+    """
+    
+    if not client:
+        return parse_user_prompt_fallback(prompt, mapping_df)
+    
+    # Get list of available datapoints
+    available_datapoints = mapping_df['Datapoint'].unique().tolist()
+    
+    llm_prompt = f"""You are a financial document query parser. Analyze the user's question and identify:
+1. Which datapoint they are asking about
+2. Which share class they are interested in
+
+USER QUERY: {prompt}
+
+AVAILABLE DATAPOINTS:
+{', '.join(available_datapoints)}
+
+COMMON SHARE CLASSES:
+Class A, Class B, Class C, Class F, Class I, Class R, Class Z
+
+OUTPUT FORMAT (respond in exactly this JSON format):
+{{
+    "datapoint": "the exact datapoint name from the available list (or null if unclear)",
+    "class": "the share class in format 'Class X' (or null if not specified)"
+}}
+
+Example responses:
+- For "What is the total annual fund operating expenses for Class A?": {{"datapoint": "TOTAL_ANNUAL_FUND_OPERATING_EXPENSES", "class": "Class A"}}
+- For "Initial investment Class C": {{"datapoint": "INITIAL_INVESTMENT", "class": "Class C"}}
+- For "CDSC Class I": {{"datapoint": "CDSC", "class": "Class I"}}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a query parsing assistant. Always respond with valid JSON."},
+                {"role": "user", "content": llm_prompt}
+            ],
+            temperature=0.1,
+            max_tokens=200
+        )
+        
+        response_text = response.choices[0].message.content.strip()
+        
+        # Extract JSON
+        import json
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        result = json.loads(response_text)
+        
+        datapoint = result.get("datapoint")
+        class_name = result.get("class")
+        
+        return datapoint, class_name
+        
+    except Exception as e:
+        st.error(f"Prompt parsing error: {str(e)}")
+        # Fallback to simple pattern matching
+        return parse_user_prompt_fallback(prompt, mapping_df)
+
+
+def parse_user_prompt_fallback(prompt: str, mapping_df: pd.DataFrame) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Fallback parser using rule-based matching when LLM fails.
+    """
+    prompt_lower = prompt.lower()
+    
+    # Extract class name
+    class_name = None
+    class_patterns = [
+        r'class\s+([a-z])\b',
+        r'class\s+([a-z])\s+shares',
+        r'for\s+class\s+([a-z])',
+        r'\(class\s+([a-z])\)'
+    ]
+    
+    for pattern in class_patterns:
+        match = re.search(pattern, prompt_lower)
+        if match:
+            class_name = f"Class {match.group(1).upper()}"
+            break
+    
+    # Match against instruction patterns
+    for _, row in mapping_df.iterrows():
+        instruction_pattern = row['Instruction'].lower().replace('{class}', '.*?')
+        if re.search(instruction_pattern, prompt_lower, re.IGNORECASE):
+            return row['Datapoint'], class_name or row['Class']
+    
+    # Fallback: keyword matching
+    if 'total annual fund operating expenses' in prompt_lower or 'total_annual_fund_operating_expenses' in prompt_lower:
+        return 'TOTAL_ANNUAL_FUND_OPERATING_EXPENSES', class_name
+    elif 'net expenses' in prompt_lower or 'net_expenses' in prompt_lower:
+        return 'NET_EXPENSES', class_name
+    elif 'automatic investment plan' in prompt_lower and 'subsequent' in prompt_lower:
+        return 'MINIMUM_SUBSEQUENT_INVESTMENT_AIP', class_name
+    elif 'initial investment' in prompt_lower:
+        return 'INITIAL_INVESTMENT', class_name
+    elif 'cdsc' in prompt_lower:
+        return 'CDSC', class_name
+    elif 'redemption fee' in prompt_lower:
+        return 'REDEMPTION_FEE', class_name
+    
+    return None, class_name
+
+
+# ============================================================================
+# Legacy Rule-Based Data Extraction Functions (Kept as Fallback)
 # ============================================================================
 
 def extract_datapoint(text: str, tables: List[List[str]], datapoint_name: str, 
@@ -432,59 +687,8 @@ def generate_hyperlink(doc_type: str, location: Optional[str],
 # Chatbot Response Handler
 # ============================================================================
 
-def parse_user_prompt(prompt: str, mapping_df: pd.DataFrame) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Parse user prompt to identify datapoint and class.
-    
-    Args:
-        prompt: User's natural language prompt
-        mapping_df: DataFrame with datapoint mappings
-        
-    Returns:
-        Tuple of (datapoint_name, class_name)
-    """
-    prompt_lower = prompt.lower()
-    
-    # Extract class name
-    class_name = None
-    class_patterns = [
-        r'class\s+([a-z])\b',
-        r'class\s+([a-z])\s+shares',
-        r'for\s+class\s+([a-z])',
-        r'\(class\s+([a-z])\)'
-    ]
-    
-    for pattern in class_patterns:
-        match = re.search(pattern, prompt_lower)
-        if match:
-            class_name = f"Class {match.group(1).upper()}"
-            break
-    
-    # Match against instruction patterns
-    for _, row in mapping_df.iterrows():
-        instruction_pattern = row['Instruction'].lower().replace('{class}', '.*?')
-        if re.search(instruction_pattern, prompt_lower, re.IGNORECASE):
-            return row['Datapoint'], class_name or row['Class']
-    
-    # Fallback: keyword matching
-    if 'total annual fund operating expenses' in prompt_lower or 'total_annual_fund_operating_expenses' in prompt_lower:
-        return 'TOTAL_ANNUAL_FUND_OPERATING_EXPENSES', class_name
-    elif 'net expenses' in prompt_lower or 'net_expenses' in prompt_lower:
-        return 'NET_EXPENSES', class_name
-    elif 'automatic investment plan' in prompt_lower and 'subsequent' in prompt_lower:
-        return 'MINIMUM_SUBSEQUENT_INVESTMENT_AIP', class_name
-    elif 'initial investment' in prompt_lower:
-        return 'INITIAL_INVESTMENT', class_name
-    elif 'cdsc' in prompt_lower:
-        return 'CDSC', class_name
-    elif 'redemption fee' in prompt_lower:
-        return 'REDEMPTION_FEE', class_name
-    
-    return None, class_name
-
-
 def chatbot_response(user_prompt: str, parsed_docs: Dict[str, Any], 
-                    mapping_df: pd.DataFrame) -> str:
+                    mapping_df: pd.DataFrame, use_llm: bool = True) -> str:
     """
     Process user prompt and return extracted data with hyperlink.
     
@@ -492,12 +696,21 @@ def chatbot_response(user_prompt: str, parsed_docs: Dict[str, Any],
         user_prompt: User's natural language query
         parsed_docs: Dictionary containing parsed document data
         mapping_df: DataFrame with datapoint mappings
+        use_llm: Whether to use LLM-based extraction (default: True)
         
     Returns:
         Formatted response string
     """
+    # Check if API key is configured
+    if use_llm and not os.getenv("OPENAI_API_KEY"):
+        st.warning("⚠️ OpenAI API key not found. Falling back to rule-based extraction. Please set OPENAI_API_KEY in .env file.")
+        use_llm = False
+    
     # Parse the prompt
-    datapoint_name, class_name = parse_user_prompt(user_prompt, mapping_df)
+    if use_llm:
+        datapoint_name, class_name = parse_user_prompt_with_llm(user_prompt, mapping_df)
+    else:
+        datapoint_name, class_name = parse_user_prompt_fallback(user_prompt, mapping_df)
     
     if not datapoint_name:
         return "❌ Could not identify the datapoint from your query. Please rephrase or be more specific."
@@ -518,22 +731,37 @@ def chatbot_response(user_prompt: str, parsed_docs: Dict[str, Any],
             for page_tables in doc_data.get('tables', {}).values():
                 tables.extend(page_tables)
             
-            value, location = extract_datapoint(all_text, tables, datapoint_name, class_name, output_rule)
-            
-            if value and value != "0":
+            if use_llm:
+                # Use LLM-based extraction with page tracking
+                value, location, page_num = extract_datapoint_with_llm(
+                    all_text, tables, datapoint_name, class_name, output_rule, 
+                    doc_data['pages']
+                )
+            else:
+                # Use legacy rule-based extraction
+                value, location = extract_datapoint(all_text, tables, datapoint_name, class_name, output_rule)
                 # Find which page it was on (approximate)
                 page_num = None
                 for pnum, ptext in doc_data['pages'].items():
                     if location and any(keyword in ptext.lower() for keyword in location.split()):
                         page_num = pnum
                         break
-                
+            
+            if value and value != "0":
                 hyperlink = generate_hyperlink('pdf', location, page_num)
                 results.append(f"**{value}**\n{hyperlink}")
         
         elif doc_data['type'] == 'html':
             all_text = doc_data['text']
-            value, location = extract_datapoint(all_text, [], datapoint_name, class_name, output_rule)
+            
+            if use_llm:
+                # Use LLM-based extraction
+                value, location, _ = extract_datapoint_with_llm(
+                    all_text, [], datapoint_name, class_name, output_rule
+                )
+            else:
+                # Use legacy rule-based extraction
+                value, location = extract_datapoint(all_text, [], datapoint_name, class_name, output_rule)
             
             if value and value != "0":
                 hyperlink = generate_hyperlink('html', location)
@@ -558,8 +786,15 @@ def main():
         layout="wide"
     )
     
-    st.title("🤖 SmartAlly - Rule-Based Document Data Extractor")
-    st.markdown("Upload PDF or HTML documents and ask questions to extract specific data points.")
+    st.title("🤖 SmartAlly - LLM-Powered Document Data Extractor")
+    st.markdown("Upload PDF or HTML documents and ask questions to extract specific data points using GPT-3.5 Turbo.")
+    
+    # Check API key status
+    api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
+    if api_key_configured:
+        st.success("✅ OpenAI API Key configured - LLM extraction enabled")
+    else:
+        st.warning("⚠️ OpenAI API Key not found. Using fallback rule-based extraction. To enable LLM features, create a `.env` file with your `OPENAI_API_KEY`.")
     
     # Load datapoint mapping
     try:
@@ -584,14 +819,30 @@ def main():
                 st.text(f"• {file.name}")
         
         st.markdown("---")
+        
+        # Extraction mode toggle
+        st.header("⚙️ Settings")
+        use_llm = st.checkbox(
+            "Use LLM Extraction", 
+            value=api_key_configured,
+            disabled=not api_key_configured,
+            help="Use GPT-3.5 Turbo for intelligent data extraction. Requires OpenAI API key."
+        )
+        
+        if 'use_llm' not in st.session_state:
+            st.session_state.use_llm = use_llm
+        else:
+            st.session_state.use_llm = use_llm
+        
+        st.markdown("---")
         st.markdown("### 📖 Example Queries")
         st.markdown("""
-        - Return only the Data Value of TOTAL_ANNUAL_FUND_OPERATING_EXPENSES for Class A
-        - Return only the Data Value of NET_EXPENSES (after fee waiver/expense reimbursement) for Class F
-        - From the Minimum Investment section, extract the value for Automatic Investment Plans under Subsequent investment for Class R
+        - What is the total annual fund operating expenses for Class A?
+        - Return the net expenses for Class F
         - Initial investment for Class C Shares
-        - CDSC Class C
+        - What is the CDSC for Class C?
         - Redemption Fee for Class Z
+        - Minimum subsequent investment for AIP Class R
         """)
     
     # Initialize session state for chat history
@@ -647,7 +898,9 @@ def main():
         if not st.session_state.parsed_docs:
             response = "❌ Please upload at least one document before asking questions."
         else:
-            response = chatbot_response(prompt, st.session_state.parsed_docs, mapping_df)
+            # Use the LLM setting from session state
+            use_llm_mode = st.session_state.get('use_llm', api_key_configured)
+            response = chatbot_response(prompt, st.session_state.parsed_docs, mapping_df, use_llm=use_llm_mode)
         
         # Add assistant response to chat
         st.session_state.messages.append({"role": "assistant", "content": response})
