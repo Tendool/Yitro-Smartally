@@ -2,6 +2,38 @@
 
 SmartAlly is a Streamlit-based application that extracts structured data from PDF and HTML documents using OpenAI's GPT-3.5 Turbo for intelligent pattern matching and natural language queries.
 
+## 🚀 Quick Start Guide
+
+### For Impatient Users (3 Steps to Get Started)
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure your OpenAI API key
+cp .env.example .env
+# Edit .env and add: OPENAI_API_KEY=your_api_key_here
+
+# 3. Run the application
+streamlit run smartally.py
+```
+
+Then:
+1. 📁 **Upload** a PDF or HTML document
+2. 💬 **Ask** "What is the total annual operating expenses for Class A?"
+3. ✅ **Get** instant results with page references!
+
+### What Makes SmartAlly Special?
+
+| Feature | Description |
+|---------|-------------|
+| 🧠 **AI-Powered** | Uses GPT-3.5 Turbo for intelligent understanding |
+| 🎯 **Precise** | Exact page number references for every extraction |
+| 💬 **Natural Language** | Ask questions in plain English |
+| ⚡ **Fast** | Cached document parsing for quick responses |
+| 🔄 **Fallback Mode** | Works even without API key (rule-based) |
+| 🔒 **Secure** | API keys stored safely in .env file |
+
 ## 📊 Solution Overview
 
 ### System Architecture Flowchart
@@ -635,6 +667,139 @@ Yitro-Smartally/
 ### Testing
 
 Upload sample PDF or HTML files containing fund prospectus data and test various queries to ensure accurate extraction.
+
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. "OpenAI API Key not found" warning
+
+**Problem:** Application shows a warning about missing API key.
+
+**Solution:**
+```bash
+# Create .env file from example
+cp .env.example .env
+
+# Edit .env and add your API key
+nano .env  # or use any text editor
+
+# Make sure the file contains:
+OPENAI_API_KEY=sk-proj-your-actual-key-here
+```
+
+#### 2. OpenAI API errors or timeouts
+
+**Problem:** "API request failed" or timeout errors.
+
+**Solutions:**
+- Check your API key is valid at [OpenAI Platform](https://platform.openai.com/api-keys)
+- Verify you have API credits available
+- Check your internet connection
+- The app will automatically fall back to rule-based mode
+
+#### 3. Document parsing fails
+
+**Problem:** Uploaded document doesn't parse correctly.
+
+**Solutions:**
+- Ensure file is a valid PDF or HTML
+- Check file isn't password-protected or corrupted
+- Try a different file format (PDF vs HTML)
+- Check file size (very large files may take time)
+
+#### 4. No results found for query
+
+**Problem:** System returns "Value not found" or "0".
+
+**Solutions:**
+- Check your query includes the share class (e.g., "Class A")
+- Verify the datapoint exists in the document
+- Try rephrasing your question
+- Use more specific queries
+- Check the document contains the expected data
+
+#### 5. Installation errors
+
+**Problem:** `pip install` fails or module not found errors.
+
+**Solutions:**
+```bash
+# Upgrade pip first
+python3 -m pip install --upgrade pip
+
+# Install with user flag if permission denied
+pip install --user -r requirements.txt
+
+# Use virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+```
+
+#### 6. Streamlit won't start
+
+**Problem:** `streamlit run` command not found.
+
+**Solutions:**
+```bash
+# Install streamlit explicitly
+pip install streamlit
+
+# Or run with python module
+python3 -m streamlit run smartally.py
+
+# Check if streamlit is in PATH
+which streamlit  # Linux/Mac
+where streamlit  # Windows
+```
+
+### Performance Tips
+
+1. **First query may be slow** - Subsequent queries are faster due to caching
+2. **Use LLM mode for best accuracy** - But fallback mode is faster
+3. **Upload multiple documents** - They're all parsed and cached
+4. **Clear cache if issues** - Restart the app to clear session state
+
+### Getting Help
+
+- 📖 Read the [USAGE_GUIDE.md](USAGE_GUIDE.md) for detailed instructions
+- 🐛 Report issues on [GitHub Issues](https://github.com/Tendool/Yitro-Smartally/issues)
+- 💡 Check [FEATURES.md](FEATURES.md) for complete feature list
+
+## 💡 Tips & Best Practices
+
+### For Best Results
+
+1. **Use Specific Queries**
+   - ✅ Good: "What is the total annual operating expenses for Class A?"
+   - ❌ Avoid: "Show me expenses"
+
+2. **Include Share Class**
+   - Always mention the specific class (Class A, Class I, etc.)
+   - Be consistent with naming (use "Class A" not "A Class")
+
+3. **Verify Results**
+   - Click the page link to verify the extracted value
+   - Cross-check with the original document
+
+4. **Document Quality**
+   - Use clear, well-formatted PDFs for best results
+   - Scanned PDFs with OCR work but may have lower accuracy
+
+5. **API Key Management**
+   - Never commit .env file to git
+   - Rotate keys periodically
+   - Set usage limits in OpenAI dashboard
+   - Monitor your API usage and costs
+
+### Cost Optimization
+
+- **Use Fallback Mode** for testing and development (free)
+- **Use LLM Mode** for production and accuracy (costs API credits)
+- **Cache documents** to avoid re-parsing (automatic)
+- **Batch similar queries** together for efficiency
 
 ## License
 
