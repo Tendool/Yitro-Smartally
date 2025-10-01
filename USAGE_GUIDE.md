@@ -15,12 +15,25 @@ cd Yitro-Smartally
 pip install -r requirements.txt
 ```
 
-3. Run the application:
+3. Configure OpenAI API Key (for LLM features):
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and add your OpenAI API key
+# OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Get your API key from: https://platform.openai.com/api-keys
+
+**Note**: Without an API key, the app will use rule-based extraction as fallback.
+
+4. Run the application:
 ```bash
 streamlit run smartally.py
 ```
 
-4. Open your browser to `http://localhost:8501`
+5. Open your browser to `http://localhost:8501`
 
 ## Using SmartAlly
 
@@ -30,13 +43,25 @@ streamlit run smartally.py
 2. Select one or more PDF or HTML files containing fund prospectus data
 3. Wait for the files to be parsed (you'll see a green success message)
 
-### Step 2: Ask Questions
+### Step 2: Configure Extraction Mode
 
-Type natural language queries in the chat input at the bottom of the page. SmartAlly supports these types of queries:
+In the sidebar settings:
+- **LLM Extraction**: Toggle on for intelligent GPT-3.5 Turbo extraction (requires API key)
+- **Rule-Based**: Automatically used as fallback when API key not configured
+
+### Step 3: Ask Questions
+
+Type natural language queries in the chat input at the bottom of the page. With LLM mode, you can use more natural language:
 
 #### Expenses Queries
 
-**Total Annual Fund Operating Expenses:**
+**Total Annual Fund Operating Expenses (Natural Language):**
+```
+What is the total annual fund operating expenses for Class A?
+```
+Expected output: `1.19%` (with link to page/section)
+
+**Traditional Format:**
 ```
 Return only the Data Value of TOTAL_ANNUAL_FUND_OPERATING_EXPENSES for Class A
 ```
@@ -44,13 +69,19 @@ Expected output: `1.19%` (with link to page/section)
 
 **Net Expenses:**
 ```
-Return only the Data Value of NET_EXPENSES (after fee waiver/expense reimbursement) for Class F
+Return the net expenses for Class F
 ```
 Expected output: `0.75%` (with link to page/section)
 
 #### Investment Minimums
 
-**Initial Investment:**
+**Initial Investment (Natural Language):**
+```
+What is the initial investment for Class C?
+```
+Expected output: `No minimum` or `$2,500` (with link)
+
+**Traditional Format:**
 ```
 Initial investment for Class C Shares
 ```
@@ -58,7 +89,7 @@ Expected output: `No minimum` or `$2,500` (with link)
 
 **Subsequent Investment (Automatic Investment Plans):**
 ```
-From the Minimum Investment section, extract the value for Automatic Investment Plans under Subsequent investment for Class R
+Minimum subsequent investment for AIP Class R
 ```
 Expected output: `$25` (with link)
 
@@ -66,7 +97,7 @@ Expected output: `$25` (with link)
 
 **CDSC (Contingent Deferred Sales Charge):**
 ```
-CDSC Class C
+What is the CDSC for Class C?
 ```
 Expected output: `1 year, 1.00% then 0%` (with link)
 
@@ -76,11 +107,12 @@ Redemption Fee for Class Z
 ```
 Expected output: Fee details or `No redemption fee` (with link)
 
-### Step 3: View Results
+### Step 4: View Results
 
 Each response includes:
 - **The extracted value** (in bold)
 - **A hyperlink** to the document location (page number for PDFs, section for HTML)
+- **Accurate page numbers** when LLM mode is enabled (using context matching)
 
 ## Supported Share Classes
 
@@ -104,10 +136,25 @@ HTML files should contain:
 - Tables for tabular data
 - Optional: Element IDs for better hyperlink accuracy
 
-## Extraction Rules
+## Extraction Modes
 
-SmartAlly uses rule-based extraction with these output formats:
+### LLM Mode (Recommended)
 
+SmartAlly uses OpenAI GPT-3.5 Turbo to:
+- Understand natural language queries
+- Extract data intelligently from unstructured text
+- Identify context for accurate page number detection
+- Handle variations in document formatting
+
+Benefits:
+- More flexible query understanding
+- Better handling of complex document structures
+- Accurate page number detection
+- Can understand context and relationships
+
+### Rule-Based Mode (Fallback)
+
+Uses pattern matching with these output formats:
 - **Percentage**: Returns values like "1.19%" or "0.85%"
 - **Currency**: Returns dollar amounts like "$100" or "$1,000,000"
 - **Text**: Returns raw text like "No minimum" or "No redemption fee"
@@ -115,7 +162,7 @@ SmartAlly uses rule-based extraction with these output formats:
 
 ## Tips for Best Results
 
-1. **Use clear, specific queries**: Mention the exact datapoint name and share class
+1. **Use clear, specific queries**: With LLM mode, you can use natural language
 2. **Upload relevant documents**: Ensure documents contain the data you're looking for
 3. **Check multiple classes**: If you need data for multiple classes, ask separate queries
 4. **Review hyperlinks**: Click the provided links to verify the source location
