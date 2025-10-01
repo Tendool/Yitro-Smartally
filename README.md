@@ -205,29 +205,74 @@ Display in Chat: "The total annual fund operating expenses for Class A is 1.19%
 
 ## Installation
 
-1. Clone the repository:
+### Prerequisites
+
+- Python 3.8 or higher
+- pip (Python package installer)
+- OpenAI API key (for LLM features) - Get yours at [OpenAI Platform](https://platform.openai.com/api-keys)
+
+### Step-by-Step Installation
+
+1. **Clone the repository:**
 ```bash
 git clone https://github.com/Tendool/Yitro-Smartally.git
 cd Yitro-Smartally
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Configure OpenAI API Key (required for LLM features):
-```bash
-# Copy the example environment file
-cp .env.example .env
+3. **Configure OpenAI API Key (Required for LLM features):**
 
-# Edit .env and add your OpenAI API key
-# OPENAI_API_KEY=your_openai_api_key_here
+   **Option A: Using .env file (Recommended)**
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env file and add your OpenAI API key
+   nano .env  # or use any text editor
+   ```
+   
+   In the `.env` file, replace the placeholder with your actual API key:
+   ```bash
+   OPENAI_API_KEY=your_actual_api_key_here
+   OPENAI_MODEL=gpt-3.5-turbo
+   ```
+
+   **Option B: Using environment variable**
+   ```bash
+   # Linux/Mac
+   export OPENAI_API_KEY=your_actual_api_key_here
+   
+   # Windows (Command Prompt)
+   set OPENAI_API_KEY=your_actual_api_key_here
+   
+   # Windows (PowerShell)
+   $env:OPENAI_API_KEY="your_actual_api_key_here"
+   ```
+
+   **🔑 How to get your OpenAI API Key:**
+   - Visit [OpenAI Platform](https://platform.openai.com/api-keys)
+   - Sign up or log in to your account
+   - Navigate to API Keys section
+   - Click "Create new secret key"
+   - Copy the key immediately (you won't be able to see it again)
+   - Paste it in your `.env` file
+
+   **⚠️ Important Security Notes:**
+   - Never commit your `.env` file to git (it's already in `.gitignore`)
+   - Never share your API key publicly
+   - Rotate your key if it's ever exposed
+   - Set usage limits in OpenAI dashboard to control costs
+
+4. **Verify installation:**
+```bash
+python -c "import streamlit; import openai; print('✅ All dependencies installed!')"
 ```
 
-Get your API key from: https://platform.openai.com/api-keys
-
-**Note**: If you don't configure an API key, the application will automatically use rule-based pattern matching as a fallback.
+**Note**: If you don't configure an API key, the application will automatically use rule-based pattern matching as a fallback (no API key required for basic functionality).
 
 ## Usage
 
@@ -305,13 +350,66 @@ Instruction,Datapoint,Class,OutputRule
 
 ```
 Yitro-Smartally/
-├── smartally.py              # Main application
-├── datapoint_mapping.csv     # Datapoint extraction rules
-├── requirements.txt          # Python dependencies
-├── .env.example              # Example environment configuration
-├── .env                      # Your API keys (create this)
-└── README.md                 # This file
+├── 📄 smartally.py              # Main application (860 lines)
+│   ├── Document Parsing Functions
+│   │   ├── parse_pdf()          # Extract text from PDFs
+│   │   ├── parse_pdf_tables()   # Extract tables from PDFs
+│   │   └── parse_html()         # Parse HTML documents
+│   ├── LLM-Based Extraction
+│   │   ├── extract_datapoint_with_llm()     # GPT-3.5 extraction
+│   │   └── parse_user_prompt_with_llm()     # Query understanding
+│   ├── Rule-Based Extraction (Fallback)
+│   │   ├── extract_datapoint()              # Main dispatcher
+│   │   ├── extract_annual_expenses()        # Extract expenses
+│   │   ├── extract_net_expenses()           # Extract net expenses
+│   │   ├── extract_minimum_investment_aip() # Extract AIP minimums
+│   │   ├── extract_initial_investment()     # Extract initial inv.
+│   │   ├── extract_cdsc()                   # Extract CDSC
+│   │   └── extract_redemption_fee()         # Extract fees
+│   ├── Response Generation
+│   │   ├── chatbot_response()   # Coordinate extraction
+│   │   └── generate_hyperlink() # Create page links
+│   └── Main Application
+│       └── main()                # Streamlit UI
+│
+├── 📊 datapoint_mapping.csv     # Datapoint extraction rules
+│   └── Maps: Instructions → Datapoints → Classes → Output Rules
+│
+├── 📦 requirements.txt          # Python dependencies
+│   ├── Streamlit 1.28.0        # Web UI framework
+│   ├── OpenAI >=1.35.0         # GPT-3.5 Turbo API
+│   ├── PyMuPDF 1.23.5          # PDF text extraction
+│   ├── pdfplumber 0.10.3       # PDF table extraction
+│   ├── BeautifulSoup4 4.12.2   # HTML parsing
+│   ├── pandas 2.1.1            # Data manipulation
+│   └── python-dotenv 1.0.0     # Environment variables
+│
+├── 🔧 .env.example              # Example environment configuration
+│   ├── OPENAI_API_KEY          # Your OpenAI API key
+│   └── OPENAI_MODEL            # Model selection (default: gpt-3.5-turbo)
+│
+├── 🔒 .env                      # Your actual API keys (create this, NOT in git)
+│
+├── 🧪 test_extraction.py        # Test suite for extraction functions
+│
+├── 🚀 run.sh                    # Quick start script (Linux/Mac)
+├── 🚀 run.bat                   # Quick start script (Windows)
+│
+├── 📖 README.md                 # This comprehensive guide
+├── 📖 USAGE_GUIDE.md            # Detailed usage instructions
+├── 📖 FEATURES.md               # Complete feature list
+│
+└── 📁 .gitignore               # Git ignore rules (includes .env)
 ```
+
+### File Sizes & Statistics
+
+| File | Lines of Code | Purpose |
+|------|---------------|---------|
+| `smartally.py` | ~860 | Main application logic |
+| `test_extraction.py` | ~124 | Test suite |
+| `datapoint_mapping.csv` | ~10 | Datapoint definitions |
+| **Total Code** | ~984 | Production + Tests |
 
 ## Architecture
 
