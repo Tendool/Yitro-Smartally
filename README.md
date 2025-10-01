@@ -34,6 +34,34 @@ Then:
 | 🔄 **Fallback Mode** | Works even without API key (rule-based) |
 | 🔒 **Secure** | API keys stored safely in .env file |
 
+## 📚 Documentation
+
+### Complete Documentation Package (Word Document)
+
+**📄 [SmartAlly_Complete_Documentation.docx](SmartAlly_Complete_Documentation.docx)** - A comprehensive Word document containing:
+
+- **Cover Page & Table of Contents** - Professional presentation
+- **Complete Flowcharts** - All system architecture diagrams (12+ flowcharts)
+- **Tech Stack Details** - Complete technology breakdown with justifications
+- **Architecture Guide** - 5-layer technical architecture with detailed diagrams
+- **Features & Capabilities** - Complete feature list
+- **Usage Guide** - Step-by-step instructions
+- **Implementation Summary** - Technical details and configuration
+
+**File Size:** 65.8 KB | **Pages:** 60+ | **Sections:** 6 major sections
+
+This document consolidates all markdown documentation (README, ARCHITECTURE, SOLUTION_OVERVIEW, FEATURES, USAGE_GUIDE, IMPLEMENTATION_SUMMARY) into a single, professionally formatted Word document.
+
+### Individual Documentation Files
+
+For detailed reading in markdown format, see:
+- 📖 [README.md](README.md) - This file (main guide with flowcharts)
+- 📖 [ARCHITECTURE.md](ARCHITECTURE.md) - Visual architecture guide (561 lines)
+- 📖 [SOLUTION_OVERVIEW.md](SOLUTION_OVERVIEW.md) - Executive summary (382 lines)
+- 📖 [FEATURES.md](FEATURES.md) - Complete feature list (211 lines)
+- 📖 [USAGE_GUIDE.md](USAGE_GUIDE.md) - Detailed usage instructions (239 lines)
+- 📖 [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Implementation details (365 lines)
+
 ## 📊 Solution Overview
 
 ### System Architecture Flowchart
