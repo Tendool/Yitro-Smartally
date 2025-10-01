@@ -690,13 +690,26 @@ OPENAI_API_KEY=sk-proj-your-actual-key-here
 
 #### 2. OpenAI API errors or timeouts
 
-**Problem:** "API request failed" or timeout errors.
+**Problem:** "API request failed", "Client.__init__() got an unexpected keyword argument" or timeout errors.
 
 **Solutions:**
+
+**If you see "Client.__init__() got an unexpected keyword argument 'proxies'":**
+```bash
+# This is a version compatibility issue. Install compatible versions:
+pip install 'openai>=1.35.0' 'httpx>=0.24.0,<0.28.0'
+
+# Or use these specific versions that are known to work:
+pip install openai==1.35.0 httpx==0.27.0
+```
+
+**Other API issues:**
 - Check your API key is valid at [OpenAI Platform](https://platform.openai.com/api-keys)
 - Verify you have API credits available
 - Check your internet connection
-- The app will automatically fall back to rule-based mode
+- The app will automatically fall back to rule-based mode if API fails
+
+**Note:** The application will work in fallback mode even if the OpenAI library has issues. Only LLM features require the API.
 
 #### 3. Document parsing fails
 
