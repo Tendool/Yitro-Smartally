@@ -20,7 +20,7 @@ load_dotenv()
 
 # Initialize OpenAI client (only if API key is available)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")
 
 if OPENAI_API_KEY:
     from openai import OpenAI
@@ -660,7 +660,8 @@ def extract_redemption_fee(text: str, class_variations: List[str],
 # ============================================================================
 
 def generate_hyperlink(doc_type: str, location: Optional[str], 
-                       page_num: Optional[int] = None, element_id: Optional[str] = None) -> str:
+                       page_num: Optional[int] = None, element_id: Optional[str] = None,
+                       doc_name: Optional[str] = None) -> str:
     """
     Generate a hyperlink to the location in the document.
     
@@ -669,18 +670,23 @@ def generate_hyperlink(doc_type: str, location: Optional[str],
         location: Description of where the value was found
         page_num: Page number (for PDFs)
         element_id: Element ID (for HTML)
+        doc_name: Name of the document file
         
     Returns:
-        Hyperlink string
+        Hyperlink string with enhanced formatting
     """
     if doc_type == "pdf" and page_num:
-        return f"📄 [Found on page {page_num}](#{page_num})"
+        doc_ref = f" in `{doc_name}`" if doc_name else ""
+        return f"📄 **Page {page_num}**{doc_ref} - {location if location else 'See document for details'}"
     elif doc_type == "html" and element_id:
-        return f"🔗 [Found at #{element_id}](#{element_id})"
+        doc_ref = f" in `{doc_name}`" if doc_name else ""
+        return f"🔗 **Section #{element_id}**{doc_ref} - {location if location else 'See document for details'}"
     elif location:
-        return f"📍 Found in: {location}"
+        doc_ref = f" (`{doc_name}`)" if doc_name else ""
+        return f"📍 **Source:** {location}{doc_ref}"
     else:
-        return "📍 Location unknown"
+        doc_ref = f" in `{doc_name}`" if doc_name else ""
+        return f"📍 **Location:** Document reference{doc_ref}"
 
 
 # ============================================================================
@@ -713,10 +719,34 @@ def chatbot_response(user_prompt: str, parsed_docs: Dict[str, Any],
         datapoint_name, class_name = parse_user_prompt_fallback(user_prompt, mapping_df)
     
     if not datapoint_name:
-        return "❌ Could not identify the datapoint from your query. Please rephrase or be more specific."
+        return """
+---
+### ❌ Unable to Identify Datapoint
+
+I couldn't determine what data you're looking for from your query.
+
+**Please try:**
+- Being more specific about what you want to extract
+- Using terminology from fund prospectuses (e.g., "operating expenses", "net expenses")
+- Checking the example queries in the sidebar
+
+---
+"""
     
     if not class_name:
-        return "❌ Could not identify the share class. Please specify the class (e.g., Class A, Class I)."
+        return """
+---
+### ❌ Share Class Not Specified
+
+I couldn't identify which share class you're asking about.
+
+**Please specify one of:**
+- Class A, Class B, Class C
+- Class F, Class I, Class R, Class Z
+- Example: "What is the operating expense for **Class A**?"
+
+---
+"""
     
     # Get output rule
     output_rule = mapping_df[mapping_df['Datapoint'] == datapoint_name]['OutputRule'].iloc[0] if not mapping_df[mapping_df['Datapoint'] == datapoint_name].empty else 'text'
@@ -748,8 +778,8 @@ def chatbot_response(user_prompt: str, parsed_docs: Dict[str, Any],
                         break
             
             if value and value != "0":
-                hyperlink = generate_hyperlink('pdf', location, page_num)
-                results.append(f"**{value}**\n{hyperlink}")
+                hyperlink = generate_hyperlink('pdf', location, page_num, doc_name=doc_name)
+                results.append(f"### 💼 {value}\n{hyperlink}")
         
         elif doc_data['type'] == 'html':
             all_text = doc_data['text']
@@ -764,13 +794,28 @@ def chatbot_response(user_prompt: str, parsed_docs: Dict[str, Any],
                 value, location = extract_datapoint(all_text, [], datapoint_name, class_name, output_rule)
             
             if value and value != "0":
-                hyperlink = generate_hyperlink('html', location)
-                results.append(f"**{value}**\n{hyperlink}")
+                hyperlink = generate_hyperlink('html', location, doc_name=doc_name)
+                results.append(f"### 💼 {value}\n{hyperlink}")
     
     if results:
-        return '\n\n'.join(results)
+        # Format results with better presentation
+        response = "---\n\n" + "\n\n---\n\n".join(results) + "\n\n---"
+        return response
     else:
-        return "**0**\n📍 Value not found in uploaded documents."
+        return """
+---
+### ⚠️ No Data Found
+
+The requested datapoint was not found in the uploaded documents.
+
+**Suggestions:**
+- Verify the document contains the requested information
+- Try rephrasing your query
+- Ensure the correct share class is specified
+- Check if the document is properly formatted
+
+---
+"""
 
 
 # ============================================================================
@@ -781,20 +826,165 @@ def main():
     """Main Streamlit application."""
     
     st.set_page_config(
-        page_title="SmartAlly - Document Data Extractor",
+        page_title="SmartAlly - AI Document Data Extractor",
         page_icon="🤖",
-        layout="wide"
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
     
-    st.title("🤖 SmartAlly - LLM-Powered Document Data Extractor")
-    st.markdown("Upload PDF or HTML documents and ask questions to extract specific data points using GPT-3.5 Turbo.")
+    # Custom CSS for professional styling
+    st.markdown("""
+        <style>
+        /* Main container styling */
+        .main {
+            padding: 2rem;
+        }
+        
+        /* Title and header styling */
+        h1 {
+            color: #1E3A8A;
+            font-size: 2.5rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        /* Subtitle styling */
+        .subtitle {
+            color: #64748B;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        
+        /* Chat messages */
+        .stChatMessage {
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background-color: #F8FAFC;
+            padding: 2rem 1rem;
+        }
+        
+        [data-testid="stSidebar"] h2 {
+            color: #1E3A8A;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        /* File uploader styling */
+        [data-testid="stFileUploader"] {
+            border: 2px dashed #CBD5E1;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: white;
+        }
+        
+        /* Success messages */
+        .element-container div[data-testid="stMarkdownContainer"] p {
+            line-height: 1.6;
+        }
+        
+        /* Button styling */
+        .stButton button {
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        /* Hyperlink styling in responses */
+        .stMarkdown a {
+            color: #2563EB;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+        
+        .stMarkdown a:hover {
+            color: #1D4ED8;
+            text-decoration: underline;
+        }
+        
+        /* Badge styling */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+        
+        .badge-success {
+            background-color: #D1FAE5;
+            color: #065F46;
+        }
+        
+        .badge-info {
+            background-color: #DBEAFE;
+            color: #1E40AF;
+        }
+        
+        /* Example queries styling */
+        .example-query {
+            background-color: #F1F5F9;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+            border-left: 3px solid #3B82F6;
+        }
+        
+        /* Status indicator */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .status-success {
+            background-color: #D1FAE5;
+            border-left: 4px solid #10B981;
+        }
+        
+        .status-warning {
+            background-color: #FEF3C7;
+            border-left: 4px solid #F59E0B;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
-    # Check API key status
+    # Header with improved styling
+    st.markdown("""
+        <h1>🤖 SmartAlly - AI Document Data Extractor</h1>
+        <div class="subtitle">
+            Powered by <strong>GPT-4</strong> for intelligent extraction of structured data from PDF and HTML documents.
+            Upload your documents and ask questions in natural language to extract precise datapoints with source references.
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Check API key status with improved UI
     api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
     if api_key_configured:
-        st.success("✅ OpenAI API Key configured - LLM extraction enabled")
+        st.markdown("""
+            <div class="status-indicator status-success">
+                <span style="font-size: 1.2rem;">✅</span>
+                <span><strong>GPT-4 API Ready</strong> - Advanced LLM extraction enabled</span>
+            </div>
+        """, unsafe_allow_html=True)
     else:
-        st.warning("⚠️ OpenAI API Key not found. Using fallback rule-based extraction. To enable LLM features, create a `.env` file with your `OPENAI_API_KEY`.")
+        st.markdown("""
+            <div class="status-indicator status-warning">
+                <span style="font-size: 1.2rem;">⚠️</span>
+                <span><strong>API Key Required</strong> - Using fallback mode. Set your OpenAI API key in <code>.env</code> file to enable GPT-4 features.</span>
+            </div>
+        """, unsafe_allow_html=True)
     
     # Load datapoint mapping
     try:
@@ -803,31 +993,51 @@ def main():
         st.error("❌ datapoint_mapping.csv not found. Please ensure the file exists.")
         return
     
-    # Sidebar for file upload
+    # Improved sidebar with professional styling
     with st.sidebar:
-        st.header("📁 Upload Documents")
+        st.markdown("### 📁 Document Upload")
+        st.markdown("Upload PDF or HTML documents to extract data")
+        
         uploaded_files = st.file_uploader(
-            "Upload PDF or HTML files",
+            "Choose files",
             type=['pdf', 'html', 'htm'],
             accept_multiple_files=True,
-            key='file_uploader'
+            key='file_uploader',
+            help="Upload one or more PDF or HTML documents"
         )
         
         if uploaded_files:
-            st.success(f"✅ {len(uploaded_files)} file(s) uploaded")
-            for file in uploaded_files:
-                st.text(f"• {file.name}")
+            st.markdown(f"""
+                <div style="background-color: #D1FAE5; padding: 0.75rem; border-radius: 8px; margin: 1rem 0;">
+                    <span style="color: #065F46; font-weight: 600;">✅ {len(uploaded_files)} document(s) ready</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            with st.expander("📄 View uploaded files", expanded=False):
+                for file in uploaded_files:
+                    st.markdown(f"• `{file.name}`")
+        else:
+            st.info("📤 No documents uploaded yet")
         
         st.markdown("---")
         
-        # Extraction mode toggle
-        st.header("⚙️ Settings")
+        # Extraction mode toggle with better styling
+        st.markdown("### ⚙️ Settings")
         use_llm = st.checkbox(
-            "Use LLM Extraction", 
+            "Enable GPT-4 Extraction", 
             value=api_key_configured,
             disabled=not api_key_configured,
-            help="Use GPT-3.5 Turbo for intelligent data extraction. Requires OpenAI API key."
+            help="Use GPT-4 for intelligent data extraction. Requires OpenAI API key."
         )
+        
+        if api_key_configured:
+            st.markdown(f"""
+                <div style="background-color: #DBEAFE; padding: 0.5rem; border-radius: 6px; margin-top: 0.5rem;">
+                    <span style="color: #1E40AF; font-size: 0.85rem;">
+                        🚀 <strong>Model:</strong> {OPENAI_MODEL}
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
         
         if 'use_llm' not in st.session_state:
             st.session_state.use_llm = use_llm
@@ -835,15 +1045,30 @@ def main():
             st.session_state.use_llm = use_llm
         
         st.markdown("---")
-        st.markdown("### 📖 Example Queries")
+        
+        # Improved example queries section
+        st.markdown("### 💡 Example Queries")
         st.markdown("""
-        - What is the total annual fund operating expenses for Class A?
-        - Return the net expenses for Class F
-        - Initial investment for Class C Shares
-        - What is the CDSC for Class C?
-        - Redemption Fee for Class Z
-        - Minimum subsequent investment for AIP Class R
-        """)
+            <div style="font-size: 0.9rem; line-height: 1.8;">
+                <div class="example-query">📊 Total annual fund operating expenses for Class A?</div>
+                <div class="example-query">💰 Net expenses for Class F</div>
+                <div class="example-query">🎯 Initial investment for Class C Shares</div>
+                <div class="example-query">📉 CDSC schedule for Class C?</div>
+                <div class="example-query">🔄 Redemption fee for Class Z</div>
+                <div class="example-query">📈 Minimum subsequent investment (AIP) for Class R</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Additional info section
+        st.markdown("### ℹ️ About")
+        st.markdown("""
+            <div style="font-size: 0.85rem; color: #64748B; line-height: 1.6;">
+                SmartAlly uses advanced AI to extract financial data from fund prospectuses.
+                All results include source page references for verification.
+            </div>
+        """, unsafe_allow_html=True)
     
     # Initialize session state for chat history
     if 'messages' not in st.session_state:
@@ -882,13 +1107,23 @@ def main():
                             'anchors': anchors
                         }
     
+    # Show welcome message if no messages yet
+    if not st.session_state.messages and st.session_state.parsed_docs:
+        st.info("👋 **Ready to extract data!** Ask me questions about your uploaded documents. I'll find the information and show you exactly where it came from.")
+    elif not st.session_state.messages:
+        st.info("👋 **Welcome!** Upload documents using the sidebar to get started.")
+    
     # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.markdown(message["content"], unsafe_allow_html=True)
     
-    # Chat input
-    if prompt := st.chat_input("Ask a question about the uploaded documents..."):
+    # Chat input with improved placeholder
+    placeholder_text = "💬 Ask me anything about the documents... (e.g., 'What is the total annual operating expenses for Class A?')"
+    if not st.session_state.parsed_docs:
+        placeholder_text = "📤 Upload documents first to start asking questions..."
+    
+    if prompt := st.chat_input(placeholder_text, disabled=not st.session_state.parsed_docs):
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -896,16 +1131,24 @@ def main():
         
         # Generate response
         if not st.session_state.parsed_docs:
-            response = "❌ Please upload at least one document before asking questions."
+            response = """
+---
+### ⚠️ No Documents Available
+
+Please upload at least one document using the sidebar before asking questions.
+
+---
+"""
         else:
             # Use the LLM setting from session state
             use_llm_mode = st.session_state.get('use_llm', api_key_configured)
-            response = chatbot_response(prompt, st.session_state.parsed_docs, mapping_df, use_llm=use_llm_mode)
+            with st.spinner("🤔 Analyzing documents..."):
+                response = chatbot_response(prompt, st.session_state.parsed_docs, mapping_df, use_llm=use_llm_mode)
         
         # Add assistant response to chat
         st.session_state.messages.append({"role": "assistant", "content": response})
         with st.chat_message("assistant"):
-            st.markdown(response)
+            st.markdown(response, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
