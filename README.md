@@ -1,6 +1,6 @@
 # 🤖 SmartAlly - LLM-Powered Document Data Extractor Chatbot
 
-SmartAlly is a Streamlit-based application that extracts structured data from PDF and HTML documents using OpenAI's GPT-3.5 Turbo for intelligent pattern matching and natural language queries.
+SmartAlly is a Streamlit-based application that extracts structured data from PDF and HTML documents using OpenAI's GPT-4 for intelligent pattern matching and natural language queries.
 
 ## 🚀 Quick Start Guide
 
@@ -27,7 +27,7 @@ Then:
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **AI-Powered** | Uses GPT-3.5 Turbo for intelligent understanding |
+| 🧠 **AI-Powered** | Uses GPT-4 for intelligent understanding |
 | 🎯 **Precise** | Exact page number references for every extraction |
 | 💬 **Natural Language** | Ask questions in plain English |
 | ⚡ **Fast** | Cached document parsing for quick responses |
@@ -182,7 +182,7 @@ Display in Chat: "The total annual fund operating expenses for Class A is 1.19%
 
 - 📄 **Multi-format Support**: Upload and parse PDF and HTML documents
 - 🤖 **Chatbot Interface**: Natural language queries to extract specific data points
-- 🧠 **LLM-Based Extraction**: Uses GPT-3.5 Turbo for intelligent data extraction and pattern matching
+- 🧠 **LLM-Based Extraction**: Uses GPT-4 for intelligent data extraction and pattern matching
 - 🔄 **Fallback Mode**: Automatic fallback to rule-based extraction when API key is not configured
 - 📊 **Table Parsing**: Extracts data from structured tables in PDFs
 - 🔗 **Smart Source Linking**: Provides hyperlinks with accurate page numbers to the location of extracted data
@@ -245,7 +245,7 @@ Display in Chat: "The total annual fund operating expenses for Class A is 1.19%
 
 - **Python 3.8+**: Main programming language
 - **Streamlit 1.28.0**: Interactive web application framework for the chat interface
-- **OpenAI GPT-3.5 Turbo**: Large Language Model for intelligent data extraction and query understanding
+- **OpenAI GPT-4**: Large Language Model for intelligent data extraction and query understanding
 - **PyMuPDF (fitz) 1.23.5**: Fast and reliable PDF text extraction
 - **pdfplumber 0.10.3**: Advanced PDF table extraction with structure detection
 - **BeautifulSoup4 4.12.2**: HTML/XML parsing and content extraction
@@ -298,7 +298,7 @@ pip install -r requirements.txt
    In the `.env` file, replace the placeholder with your actual API key:
    ```bash
    OPENAI_API_KEY=your_actual_api_key_here
-   OPENAI_MODEL=gpt-3.5-turbo
+   OPENAI_MODEL=gpt-4
    ```
 
    **Option B: Using environment variable**
@@ -437,7 +437,7 @@ Yitro-Smartally/
 │
 ├── 📦 requirements.txt          # Python dependencies
 │   ├── Streamlit 1.28.0        # Web UI framework
-│   ├── OpenAI >=1.35.0         # GPT-3.5 Turbo API
+│   ├── OpenAI >=1.35.0         # GPT-4 API
 │   ├── PyMuPDF 1.23.5          # PDF text extraction
 │   ├── pdfplumber 0.10.3       # PDF table extraction
 │   ├── BeautifulSoup4 4.12.2   # HTML parsing
@@ -446,7 +446,7 @@ Yitro-Smartally/
 │
 ├── 🔧 .env.example              # Example environment configuration
 │   ├── OPENAI_API_KEY          # Your OpenAI API key
-│   └── OPENAI_MODEL            # Model selection (default: gpt-3.5-turbo)
+│   └── OPENAI_MODEL            # Model selection (default: gpt-4)
 │
 ├── 🔒 .env                      # Your actual API keys (create this, NOT in git)
 │
@@ -479,7 +479,7 @@ Yitro-Smartally/
 - `parse_html()`: Extracts text and anchors from HTML
 
 ### LLM-Based Extraction Module
-- `extract_datapoint_with_llm()`: Uses GPT-3.5 Turbo for intelligent extraction
+- `extract_datapoint_with_llm()`: Uses GPT-4 for intelligent extraction
 - `parse_user_prompt_with_llm()`: Uses LLM to understand user queries
 - Context-aware page number detection
 
