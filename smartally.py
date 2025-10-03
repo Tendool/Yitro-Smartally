@@ -13,6 +13,8 @@ import re
 from typing import Dict, List, Tuple, Optional, Any
 import io
 import os
+import base64
+import hashlib
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -661,9 +663,10 @@ def extract_redemption_fee(text: str, class_variations: List[str],
 
 def generate_hyperlink(doc_type: str, location: Optional[str], 
                        page_num: Optional[int] = None, element_id: Optional[str] = None,
-                       doc_name: Optional[str] = None) -> str:
+                       doc_name: Optional[str] = None, file_bytes: Optional[bytes] = None,
+                       value: Optional[str] = None) -> str:
     """
-    Generate a hyperlink to the location in the document.
+    Generate a clickable hyperlink to the location in the document.
     
     Args:
         doc_type: Type of document ("pdf" or "html")
@@ -671,16 +674,62 @@ def generate_hyperlink(doc_type: str, location: Optional[str],
         page_num: Page number (for PDFs)
         element_id: Element ID (for HTML)
         doc_name: Name of the document file
+        file_bytes: Original file bytes for creating downloadable link
+        value: The extracted value (used for creating unique tag)
         
     Returns:
-        Hyperlink string with enhanced formatting
+        Hyperlink string with clickable link and enhanced formatting
     """
-    if doc_type == "pdf" and page_num:
+    # Generate unique tag based on doc_name, page_num/element_id, and value
+    if value and doc_name:
+        tag_input = f"{doc_name}_{page_num or element_id}_{value}"
+        unique_tag = hashlib.md5(tag_input.encode()).hexdigest()[:8]
+    else:
+        unique_tag = None
+    
+    if doc_type == "pdf" and page_num and file_bytes and doc_name:
+        # Create a download link with the file
+        # Store in session state for download button
+        doc_key = f"doc_{hashlib.md5(doc_name.encode()).hexdigest()}"
+        
+        # Generate tag badge
+        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
+        
+        # Create HTML with download button embedded
+        location_text = f" - {location}" if location else " - See document for details"
+        
+        # Base64 encode for download button
+        base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
+        download_link = f'<a href="data:application/pdf;base64,{base64_pdf}" download="{doc_name}" target="_blank" style="color: #2563EB; text-decoration: none; font-weight: 600; border: 1px solid #2563EB; padding: 4px 12px; border-radius: 6px; display: inline-block; margin-top: 4px; background-color: #EFF6FF; transition: all 0.2s;">📥 Open Page {page_num} in `{doc_name}`</a>'
+        
+        return f"📄 **Page {page_num}** in `{doc_name}`{location_text}{tag_display}\n\n{download_link}\n\n<small style='color: #64748B;'>💡 <em>Click the link above to open the PDF. Navigate to page {page_num} to find the highlighted data.</em></small>"
+    
+    elif doc_type == "html" and element_id and file_bytes and doc_name:
+        # Create a download/view link for HTML
+        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
+        
+        location_text = f" - {location}" if location else " - See document for details"
+        
+        # Base64 encode for view button with anchor
+        base64_html = base64.b64encode(file_bytes).decode('utf-8')
+        view_link = f'<a href="data:text/html;base64,{base64_html}#{element_id}" target="_blank" style="color: #2563EB; text-decoration: none; font-weight: 600; border: 1px solid #2563EB; padding: 4px 12px; border-radius: 6px; display: inline-block; margin-top: 4px; background-color: #EFF6FF; transition: all 0.2s;">🔗 Open Section #{element_id} in `{doc_name}`</a>'
+        
+        return f"🔗 **Section #{element_id}** in `{doc_name}`{location_text}{tag_display}\n\n{view_link}\n\n<small style='color: #64748B;'>💡 <em>Click the link above to open the HTML document at the specific section.</em></small>"
+    
+    elif doc_type == "pdf" and page_num:
+        # Fallback without file bytes
+        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
         doc_ref = f" in `{doc_name}`" if doc_name else ""
-        return f"📄 **Page {page_num}**{doc_ref} - {location if location else 'See document for details'}"
+        location_text = f" - {location}" if location else " - See document for details"
+        return f"📄 **Page {page_num}**{doc_ref}{location_text}{tag_display}"
+    
     elif doc_type == "html" and element_id:
+        # Fallback without file bytes
+        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
         doc_ref = f" in `{doc_name}`" if doc_name else ""
-        return f"🔗 **Section #{element_id}**{doc_ref} - {location if location else 'See document for details'}"
+        location_text = f" - {location}" if location else " - See document for details"
+        return f"🔗 **Section #{element_id}**{doc_ref}{location_text}{tag_display}"
+    
     elif location:
         doc_ref = f" (`{doc_name}`)" if doc_name else ""
         return f"📍 **Source:** {location}{doc_ref}"
@@ -778,7 +827,9 @@ I couldn't identify which share class you're asking about.
                         break
             
             if value and value != "0":
-                hyperlink = generate_hyperlink('pdf', location, page_num, doc_name=doc_name)
+                file_bytes = doc_data.get('file_bytes')
+                hyperlink = generate_hyperlink('pdf', location, page_num, doc_name=doc_name, 
+                                              file_bytes=file_bytes, value=value)
                 results.append(f"### 💼 {value}\n{hyperlink}")
         
         elif doc_data['type'] == 'html':
@@ -794,7 +845,9 @@ I couldn't identify which share class you're asking about.
                 value, location = extract_datapoint(all_text, [], datapoint_name, class_name, output_rule)
             
             if value and value != "0":
-                hyperlink = generate_hyperlink('html', location, doc_name=doc_name)
+                file_bytes = doc_data.get('file_bytes')
+                hyperlink = generate_hyperlink('html', location, doc_name=doc_name, 
+                                              file_bytes=file_bytes, value=value)
                 results.append(f"### 💼 {value}\n{hyperlink}")
     
     if results:
@@ -1091,20 +1144,28 @@ def main():
             if file_name not in st.session_state.parsed_docs:
                 with st.spinner(f"📄 Parsing {file_name}..."):
                     if file_name.lower().endswith('.pdf'):
+                        # Store file bytes for later use
+                        file_bytes = file.read()
+                        file.seek(0)
                         pages = parse_pdf(file)
                         file.seek(0)
                         tables = parse_pdf_tables(file)
                         st.session_state.parsed_docs[file_name] = {
                             'type': 'pdf',
                             'pages': pages,
-                            'tables': tables
+                            'tables': tables,
+                            'file_bytes': file_bytes
                         }
                     elif file_name.lower().endswith(('.html', '.htm')):
+                        # Store file bytes for later use
+                        file_bytes = file.read()
+                        file.seek(0)
                         text, anchors = parse_html(file)
                         st.session_state.parsed_docs[file_name] = {
                             'type': 'html',
                             'text': text,
-                            'anchors': anchors
+                            'anchors': anchors,
+                            'file_bytes': file_bytes
                         }
     
     # Show welcome message if no messages yet
