@@ -31,6 +31,7 @@ Then:
 | 🎯 **Precise** | Exact page number references for every extraction |
 | 💬 **Natural Language** | Ask questions in plain English |
 | ⚡ **Fast** | Cached document parsing for quick responses |
+| 🔗 **Clickable Links** | Direct links to open documents at specific pages with unique tags |
 | 🔄 **Fallback Mode** | Works even without API key (rule-based) |
 | 🔒 **Secure** | API keys stored safely in .env file |
 
@@ -121,7 +122,8 @@ For detailed reading in markdown format, see:
 │  │ Value Format │ -> │ Page Lookup  │ -> │  Hyperlink Generator     │  │
 │  │ • Currency   │    │ • Context    │    │  • PDF page links        │  │
 │  │ • Percentage │    │   matching   │    │  • HTML anchor links     │  │
-│  │ • Text       │    │ • Location   │    │                          │  │
+│  │ • Text       │    │ • Location   │    │  • Unique tags (MD5)     │  │
+│  │              │    │              │    │  • Clickable buttons     │  │
 │  └──────────────┘    └──────────────┘    └──────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
@@ -185,7 +187,8 @@ Display in Chat: "The total annual fund operating expenses for Class A is 1.19%
 - 🧠 **LLM-Based Extraction**: Uses GPT-4 for intelligent data extraction and pattern matching
 - 🔄 **Fallback Mode**: Automatic fallback to rule-based extraction when API key is not configured
 - 📊 **Table Parsing**: Extracts data from structured tables in PDFs
-- 🔗 **Smart Source Linking**: Provides hyperlinks with accurate page numbers to the location of extracted data
+- 🔗 **Smart Source Linking**: Provides clickable hyperlinks with unique tags and page numbers to open documents at exact locations
+- 🏷️ **Unique Tag System**: Each datapoint gets a unique identifier badge for easy reference
 - 💾 **Document Caching**: Efficient parsing with cached results
 
 ## Tech Stack
