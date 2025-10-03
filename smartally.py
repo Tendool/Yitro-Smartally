@@ -104,7 +104,16 @@ def parse_html(file) -> Tuple[str, Dict[str, str]]:
     try:
         html_content = file.read()
         if isinstance(html_content, bytes):
-            html_content = html_content.decode('utf-8')
+            # Try multiple encodings to handle different file formats
+            for encoding in ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']:
+                try:
+                    html_content = html_content.decode(encoding)
+                    break
+                except (UnicodeDecodeError, AttributeError):
+                    continue
+            else:
+                # If all encodings fail, use utf-8 with error handling
+                html_content = html_content.decode('utf-8', errors='replace')
         
         soup = BeautifulSoup(html_content, 'html.parser')
         
@@ -693,7 +702,7 @@ def generate_hyperlink(doc_type: str, location: Optional[str],
         doc_key = f"doc_{hashlib.md5(doc_name.encode()).hexdigest()}"
         
         # Generate tag badge
-        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
+        tag_display = f"<span style='background-color: #FEF3C7; color: #78350F; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
         
         # Create HTML with download button embedded
         location_text = f" - {location}" if location else " - See document for details"
@@ -706,7 +715,7 @@ def generate_hyperlink(doc_type: str, location: Optional[str],
     
     elif doc_type == "html" and element_id and file_bytes and doc_name:
         # Create a download/view link for HTML
-        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
+        tag_display = f"<span style='background-color: #FEF3C7; color: #78350F; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
         
         location_text = f" - {location}" if location else " - See document for details"
         
@@ -718,14 +727,14 @@ def generate_hyperlink(doc_type: str, location: Optional[str],
     
     elif doc_type == "pdf" and page_num:
         # Fallback without file bytes
-        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
+        tag_display = f"<span style='background-color: #FEF3C7; color: #78350F; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
         doc_ref = f" in `{doc_name}`" if doc_name else ""
         location_text = f" - {location}" if location else " - See document for details"
         return f"📄 **Page {page_num}**{doc_ref}{location_text}{tag_display}"
     
     elif doc_type == "html" and element_id:
         # Fallback without file bytes
-        tag_display = f"<span style='background-color: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
+        tag_display = f"<span style='background-color: #FEF3C7; color: #78350F; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px;'>🔖 {unique_tag}</span>" if unique_tag else ""
         doc_ref = f" in `{doc_name}`" if doc_name else ""
         location_text = f" - {location}" if location else " - See document for details"
         return f"🔗 **Section #{element_id}**{doc_ref}{location_text}{tag_display}"
